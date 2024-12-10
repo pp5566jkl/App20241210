@@ -130,15 +130,15 @@ namespace App20241210
             int radiusMin = 10;
             int radiusMax = 100;
             int angleStep = 10;
-            int threshold = (int)(360.0 / angleStep * 0.7); // 投票門檻
+            int threshold = (int)(360.0 / angleStep * 0.7);
 
-            // 霍夫空間投票
+            // 初始化霍夫空間累加器
             short[,,] accumulator = new short[width, height, radiusMax];
             for (int x = 0; x < width; x++)
             {
                 for (int y = 0; y < height; y++)
                 {
-                    if (edgeImage.GetPixel(x, y).G > 128) // 邊緣像素
+                    if (edgeImage.GetPixel(x, y).G > 128) // 假設邊緣像素值為高亮
                     {
                         for (int r = radiusMin; r < radiusMax; r++)
                         {
@@ -157,27 +157,36 @@ namespace App20241210
                 }
             }
 
-            // 門檻以上的圓形繪製
+            // 從累加器中找到圓
             int count = 0;
-            for (int a = 0; a < width; a++)
+            List<string> circleDetails = new List<string>();
+            using (Graphics g = Graphics.FromImage(resultImage))
             {
-                for (int b = 0; b < height; b++)
+                for (int a = 0; a < width; a++)
                 {
-                    for (int r = radiusMin; r < radiusMax; r++)
+                    for (int b = 0; b < height; b++)
                     {
-                        if (accumulator[a, b, r] >= threshold)
+                        for (int r = radiusMin; r < radiusMax; r++)
                         {
-                            using (Graphics g = Graphics.FromImage(resultImage))
+                            if (accumulator[a, b, r] >= threshold)
                             {
+                                // 繪製紅色圓周
                                 g.DrawEllipse(Pens.Red, a - r, b - r, 2 * r, 2 * r);
+
+                                // 編號圓形
+                                g.DrawString((++count).ToString(), new Font("Arial", 10), Brushes.Blue, a, b);
+
+                                // 記錄圓心與半徑
+                                circleDetails.Add($"圓形 {count}: 圓心=({a}, {b}), 半徑={r}");
                             }
-                            count++;
                         }
                     }
                 }
             }
 
-            MessageBox.Show("找到 " + count.ToString() + " 個圓", "訊息", MessageBoxButtons.OK);
+            // 列印所有圓形資訊
+            MessageBox.Show(string.Join(Environment.NewLine, circleDetails), "檢測到的圓形資訊", MessageBoxButtons.OK);
+
             return resultImage;
         }
 
