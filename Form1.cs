@@ -130,15 +130,15 @@ namespace App20241210
             int radiusMin = 10;
             int radiusMax = 100;
             int angleStep = 10;
-            int threshold = (int)(360.0 / angleStep * 0.7); // 投票門檻
+            int threshold = (int)(360.0 / angleStep * 0.7);
 
-            // 霍夫空間投票
+            // 初始化霍夫空間累加器
             short[,,] accumulator = new short[width, height, radiusMax];
             for (int x = 0; x < width; x++)
             {
                 for (int y = 0; y < height; y++)
                 {
-                    if (edgeImage.GetPixel(x, y).G > 128) // 邊緣像素
+                    if (edgeImage.GetPixel(x, y).G > 128) // 假設邊緣像素值為高亮
                     {
                         for (int r = radiusMin; r < radiusMax; r++)
                         {
@@ -157,8 +157,14 @@ namespace App20241210
                 }
             }
 
-            // 門檻以上的圓形繪製
+            // 從累加器中找到圓（加入非極大值抑制）
             int count = 0;
+            List<string> circleDetails = new List<string>();
+
+            // 建立圓形清單
+            List<(int a, int b, int r, int votes)> circles = new List<(int, int, int, int)>();
+
+            // 收集所有可能的圓形
             for (int a = 0; a < width; a++)
             {
                 for (int b = 0; b < height; b++)
@@ -167,17 +173,53 @@ namespace App20241210
                     {
                         if (accumulator[a, b, r] >= threshold)
                         {
-                            using (Graphics g = Graphics.FromImage(resultImage))
-                            {
-                                g.DrawEllipse(Pens.Red, a - r, b - r, 2 * r, 2 * r);
-                            }
-                            count++;
+                            circles.Add((a, b, r, accumulator[a, b, r]));
                         }
                     }
                 }
             }
 
-            MessageBox.Show("找到 " + count.ToString() + " 個圓", "訊息", MessageBoxButtons.OK);
+            // 非極大值抑制：過濾掉相近的圓形
+            List<(int a, int b, int r)> filteredCircles = new List<(int, int, int)>();
+            foreach (var circle in circles)
+            {
+                bool isUnique = true;
+                foreach (var filtered in filteredCircles)
+                {
+                    double distance = Math.Sqrt(Math.Pow(circle.a - filtered.a, 2) + Math.Pow(circle.b - filtered.b, 2));
+                    if (distance < Math.Min(circle.r, filtered.r)) // 圓心距離小於半徑，視為重疊
+                    {
+                        isUnique = false;
+                        break;
+                    }
+                }
+                if (isUnique)
+                {
+                    filteredCircles.Add((circle.a, circle.b, circle.r));
+                }
+            }
+
+            // 在圖片上繪製圓與標記
+            using (Graphics g = Graphics.FromImage(resultImage))
+            {
+                foreach (var circle in filteredCircles)
+                {
+                    // 繪製紅色圓周
+                    g.DrawEllipse(Pens.Red, circle.a - circle.r, circle.b - circle.r, 2 * circle.r, 2 * circle.r);
+
+                    // 編號圓形
+                    g.DrawString((++count).ToString(), new Font("Arial", 10), Brushes.Blue, circle.a, circle.b);
+
+                    // 記錄圓心與半徑
+                    circleDetails.Add($"圓形 {count}: 圓心=({circle.a}, {circle.b}), 半徑={circle.r}");
+                }
+            }
+
+            // 顯示結果
+            string resultDetails = string.Join("\n", circleDetails);
+            MessageBox.Show(resultDetails, "檢測結果", MessageBoxButtons.OK, MessageBoxIcon.Information);
+
+
             return resultImage;
         }
 
